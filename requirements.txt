@@ -1,0 +1,47 @@
+# Core LangChain dependencies
+langchain>=0.3.7
+langchain-core>=0.3.15
+langchain-openai>=0.2.5
+langchain-community>=0.3.5
+langsmith>=0.1.139
+
+# FastAPI and web server dependencies
+fastapi>=0.115.8
+uvicorn>=0.34.0
+
+# HTTP client for async requests
+aiohttp>=3.8.0
+
+# Data validation and serialization
+pydantic>=2.0.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Document array for vector storage
+docarray>=0.40.0
+
+# Search functionality
+google-search-results>=2.4.2
+
+# Development and debugging
+ipykernel>=6.29.5
+
+# Standard library extensions (usually included but explicit for clarity)
+typing-extensions>=4.0.0
+
+# Security and cryptography (recommended for production)
+cryptography>=3.4.8
+
+# Logging and monitoring (optional but recommended)
+structlog>=23.0.0
+
+# Testing dependencies (optional)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+httpx>=0.24.0
+
+# Code quality tools (optional)
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0
