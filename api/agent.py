@@ -432,8 +432,10 @@ class QueueCallbackHandler(AsyncCallbackHandler):
     async def on_llm_end(self, *args, **kwargs) -> None:
         if self.final_answer_seen:
             self.queue.put_nowait("<<DONE>>")
+            logger.info("Final answer seen")
         else:
             self.queue.put_nowait("<<STEP_END>>")
+            logger.info("Step end token sent") 
 
 async def execute_tool(tool_call: AIMessage) -> ToolMessage:
     tool_name = tool_call.tool_calls[0]["name"]
@@ -442,7 +444,9 @@ async def execute_tool(tool_call: AIMessage) -> ToolMessage:
     return ToolMessage(
         content=f"{tool_out}",
         tool_call_id=tool_call.tool_calls[0]["id"]
-    )
+    )  
+
+
 
 # Agent Executor
 class CustomAgentExecutor:
