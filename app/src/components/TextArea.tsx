@@ -51,13 +51,16 @@ const TextArea = ({
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       console.log("📡 API URL:", `${apiUrl}/invoke`);
 
-      // Create FormData for the POST request
-      const formData = new FormData();
+      // Send as URL-encoded form data (the way FastAPI expects it)
+      const formData = new URLSearchParams();
       formData.append("content", text);
 
-      console.log("📤 Making API request...");
+      console.log("📤 Making API request with content:", text);
       const res = await fetch(`${apiUrl}/invoke`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
         body: formData,
       });
 

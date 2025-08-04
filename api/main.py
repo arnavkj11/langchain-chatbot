@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config import config
 
 from agent import QueueCallbackHandler, agent_executor
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,7 +31,7 @@ async def validate_config():
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[config.FRONTEND_URL],  # Use config for frontend URL
+    allow_origins=[config.FRONTEND_URL, "http://localhost:3000", "http://127.0.0.1:3000"],  # Allow multiple frontend URLs
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
@@ -181,7 +181,7 @@ async def health_check():
 
 # invoke function
 @app.post("/invoke")
-async def invoke(content: str):
+async def invoke(content: str = Form(...)):
     request_start_time = asyncio.get_event_loop().time()
     logger.info(f"📥 Received invoke request: '{content[:100]}{'...' if len(content) > 100 else ''}'")
     

@@ -45,3 +45,5 @@ httpx>=0.24.0
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.0.0
+
+python-multipart>=0.0.5
