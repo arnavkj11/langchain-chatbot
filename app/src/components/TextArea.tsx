@@ -30,6 +30,8 @@ const TextArea = ({
 
   // Sends message to the api and handles streaming response processing
   const sendMessage = async (text: string) => {
+    console.log("🚀 Sending message:", text);
+
     const newOutputs = [
       ...outputs,
       {
@@ -47,98 +49,154 @@ const TextArea = ({
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${apiUrl}/invoke?content=${text}`, {
+      console.log("📡 API URL:", `${apiUrl}/invoke`);
+
+      // Create FormData for the POST request
+      const formData = new FormData();
+      formData.append("content", text);
+
+      console.log("📤 Making API request...");
+      const res = await fetch(`${apiUrl}/invoke`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(text),
+        body: formData,
       });
 
+      console.log("📥 Response status:", res.status);
+      console.log(
+        "📥 Response headers:",
+        Object.fromEntries(res.headers.entries())
+      );
+
       if (!res.ok) {
-        throw new Error("Error");
+        const errorText = await res.text();
+        console.error("❌ API Error:", res.status, errorText);
+        throw new Error(`API Error: ${res.status} - ${errorText}`);
       }
 
       const data = res.body;
       if (!data) {
+        console.error("❌ No response body");
         setIsGenerating(false);
         return;
       }
 
+      console.log("✅ Starting to read stream...");
       const reader = data.getReader();
       const decoder = new TextDecoder();
       let done = false;
       let answer = { answer: "", tools_used: [] };
       let currentSteps: { name: string; result: Record<string, string> }[] = [];
       let buffer = "";
+      let chunkCount = 0;
 
       // Process streaming response chunks and parse steps/results
       while (!done) {
-        const { value, done: doneReading } = await reader.read();
-        done = doneReading;
-        let chunkValue = decoder.decode(value);
-        // console.log(`chunk: ${chunkValue}`);
-        if (!chunkValue) continue;
+        try {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          let chunkValue = decoder.decode(value);
+          chunkCount++;
 
-        buffer += chunkValue;
+          if (chunkCount <= 5) {
+            // Log first 5 chunks for debugging
+            console.log(`📦 Chunk ${chunkCount}:`, chunkValue);
+          }
 
-        // Handle different types of steps in the response stream - regular steps and final answer
-        if (buffer.includes("</step_name>")) {
-          const stepNameMatch = buffer.match(/<step_name>([^<]*)<\/step_name>/);
-          if (stepNameMatch) {
-            const [_, stepName] = stepNameMatch;
-            try {
-              if (stepName !== "final_answer") {
-                const fullStepPattern =
-                  /<step><step_name>([^<]*)<\/step_name>([^<]*?)(?=<step>|<\/step>|$)/g;
-                const matches = [...buffer.matchAll(fullStepPattern)];
+          if (!chunkValue) continue;
 
-                for (const match of matches) {
-                  const [fullMatch, matchStepName, jsonStr] = match;
-                  if (jsonStr) {
-                    try {
-                      const result = JSON.parse(jsonStr);
-                      currentSteps.push({ name: matchStepName, result });
-                      buffer = buffer.replace(fullMatch, "");
-                    } catch (error) {}
+          buffer += chunkValue;
+
+          // Handle different types of steps in the response stream - regular steps and final answer
+          if (buffer.includes("</step_name>")) {
+            const stepNameMatch = buffer.match(
+              /<step_name>([^<]*)<\/step_name>/
+            );
+            if (stepNameMatch) {
+              const [_, stepName] = stepNameMatch;
+              console.log("🔧 Processing step:", stepName);
+
+              try {
+                if (stepName !== "final_answer") {
+                  const fullStepPattern =
+                    /<step><step_name>([^<]*)<\/step_name>([^<]*?)(?=<step>|<\/step>|$)/g;
+                  const matches = [...buffer.matchAll(fullStepPattern)];
+
+                  for (const match of matches) {
+                    const [fullMatch, matchStepName, jsonStr] = match;
+                    if (jsonStr) {
+                      try {
+                        const result = JSON.parse(jsonStr);
+                        console.log(
+                          "✅ Parsed step result:",
+                          matchStepName,
+                          result
+                        );
+                        currentSteps.push({ name: matchStepName, result });
+                        buffer = buffer.replace(fullMatch, "");
+                      } catch (error) {
+                        console.error("❌ Failed to parse step JSON:", error);
+                      }
+                    }
+                  }
+                } else {
+                  // If it's the final answer step, parse the streaming JSON using incomplete-json-parser
+                  const jsonMatch = buffer.match(
+                    /(?<=<step><step_name>final_answer<\/step_name>)(.*)/
+                  );
+                  if (jsonMatch) {
+                    const [_, jsonStr] = jsonMatch;
+                    console.log("🎯 Processing final answer:", jsonStr);
+                    parser.write(jsonStr);
+                    const result = parser.getObjects();
+                    answer = result;
+                    parser.reset();
+                    console.log("✅ Final answer parsed:", answer);
                   }
                 }
-              } else {
-                // If it's the final answer step, parse the streaming JSON using incomplete-json-parser
-                const jsonMatch = buffer.match(
-                  /(?<=<step><step_name>final_answer<\/step_name>)(.*)/
-                );
-                if (jsonMatch) {
-                  const [_, jsonStr] = jsonMatch;
-                  parser.write(jsonStr);
-                  const result = parser.getObjects();
-                  answer = result;
-                  parser.reset();
-                }
+              } catch (e) {
+                console.error("❌ Failed to parse step:", e);
               }
-            } catch (e) {
-              console.log("Failed to parse step:", e);
             }
           }
-        }
 
-        // Update output with current content and steps
-        setOutputs((prevState) => {
-          const lastOutput = prevState[prevState.length - 1];
-          return [
-            ...prevState.slice(0, -1),
-            {
-              ...lastOutput,
-              steps: currentSteps,
-              result: answer,
-            },
-          ];
-        });
+          // Update output with current content and steps
+          setOutputs((prevState) => {
+            const lastOutput = prevState[prevState.length - 1];
+            return [
+              ...prevState.slice(0, -1),
+              {
+                ...lastOutput,
+                steps: currentSteps,
+                result: answer,
+              },
+            ];
+          });
+        } catch (streamError) {
+          console.error("❌ Stream processing error:", streamError);
+          break;
+        }
       }
+
+      console.log("✅ Stream processing completed");
+      console.log("📊 Final steps:", currentSteps);
+      console.log("📊 Final answer:", answer);
     } catch (error) {
-      console.error(error);
+      console.error("❌ API call failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      setOutputs((prevState) => {
+        const lastOutput = prevState[prevState.length - 1];
+        return [
+          ...prevState.slice(0, -1),
+          {
+            ...lastOutput,
+            result: { answer: `Error: ${errorMessage}`, tools_used: [] },
+          },
+        ];
+      });
     } finally {
       setIsGenerating(false);
+      console.log("🏁 Message processing finished");
     }
   };
 
