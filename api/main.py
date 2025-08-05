@@ -96,3 +96,7 @@ async def invoke(content: str):
     except Exception as e:
         print(f"Error in invoke endpoint: {e}")
         raise
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
