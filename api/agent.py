@@ -229,14 +229,17 @@ async def advanced_calculator(expression: str) -> str:
         result = evaluator.safe_eval(expression)
         
         # Format the result appropriately
+        # Format the result appropriately
         if isinstance(result, float):
             if result.is_integer():
-                return str(int(result))
+                formatted_result = str(int(result))
             else:
-                return f"{result:.10g}"  # Remove trailing zeros
+                formatted_result = f"{result:.10g}"  # Remove trailing zeros
         else:
-            logger.info(f"Calculated result for '{expression}': {result}")  # Log the result
-            return str(result)
+            formatted_result = str(result)
+
+        logger.info(f"Calculated result for '{expression}': {formatted_result}")
+        return formatted_result
         
 
     except Exception as e:
@@ -658,7 +661,6 @@ class CustomAgentExecutor:
                             # first check if we have a tool call id - this indicates a new tool
                             if tool_calls[0]["id"]:
                                 outputs.append(token)
-                                logger.debug(f"New tool call: {tool_calls[0]['function']['name']}")
                             else:
                                 if outputs:  # Make sure outputs is not empty
                                     outputs[-1] += token
@@ -666,7 +668,6 @@ class CustomAgentExecutor:
                             pass
                             
                 except asyncio.TimeoutError:
-                    logger.error(f"Streaming timed out after {stream_timeout} seconds")
                     return []
                     
                 logger.debug(f"Streaming completed with {len(outputs)} outputs")
