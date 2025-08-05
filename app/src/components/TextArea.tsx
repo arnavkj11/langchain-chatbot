@@ -136,14 +136,20 @@ const TextArea = ({
                         // Use incomplete JSON parser for step results to handle partial JSON
                         stepParser.write(jsonStr);
                         const parsedResults = stepParser.getObjects();
-                        
-                        if (parsedResults && typeof parsedResults === 'object') {
+
+                        if (
+                          parsedResults &&
+                          typeof parsedResults === "object"
+                        ) {
                           console.log(
                             "✅ Parsed step result:",
                             matchStepName,
                             parsedResults
                           );
-                          currentSteps.push({ name: matchStepName, result: parsedResults });
+                          currentSteps.push({
+                            name: matchStepName,
+                            result: parsedResults,
+                          });
                           buffer = buffer.replace(fullMatch, "");
                         }
                         stepParser.reset();
@@ -164,12 +170,15 @@ const TextArea = ({
                     try {
                       parser.write(jsonStr);
                       const result = parser.getObjects();
-                      if (result && typeof result === 'object') {
+                      if (result && typeof result === "object") {
                         answer = result;
                         console.log("✅ Final answer parsed:", answer);
                       }
                     } catch (error) {
-                      console.error("❌ Failed to parse final answer JSON:", error);
+                      console.error(
+                        "❌ Failed to parse final answer JSON:",
+                        error
+                      );
                       parser.reset(); // Reset parser state on error
                     }
                   }
