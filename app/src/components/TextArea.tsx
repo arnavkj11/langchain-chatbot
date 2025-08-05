@@ -48,7 +48,7 @@ const TextArea = ({
     setIsGenerating(true);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
       console.log("📡 API URL:", `${apiUrl}/invoke`);
 
       // Send as URL-encoded form data (the way FastAPI expects it)

@@ -42,115 +42,52 @@ async def token_generator(content: str, streamer: QueueCallbackHandler):
     logger.info(f"Starting token generation for content: '{content[:50]}{'...' if len(content) > 50 else ''}'")
     
     try:
-        # Create task with timeout
+        logger.info("Creating agent executor task...")
         task = asyncio.create_task(agent_executor.invoke(
             input=content,
             streamer=streamer,
             verbose=True  # set to True to see verbose output in console
         ))
         
-        # Add overall timeout for the entire process
-        timeout_task = asyncio.create_task(asyncio.sleep(300))  # 5 minute timeout
-        
-        # Track streaming state
-        token_count = 0
-        max_tokens = 10000
-        last_token_time = asyncio.get_event_loop().time()
-        token_timeout = 30  # 30 seconds between tokens
-        
         logger.info("Starting token streaming...")
+        token_count = 0
         
         # initialize various components to stream
-        try:
-            async for token in streamer:
-                try:
-                    current_time = asyncio.get_event_loop().time()
-                    
-                    # Check for token timeout
-                    if current_time - last_token_time > token_timeout:
-                        logger.warning("Token timeout reached, ending stream")
-                        break
-                        
-                    last_token_time = current_time
-                    token_count += 1
-                    
-                    # Prevent infinite streaming
-                    if token_count > max_tokens:
-                        logger.warning("Maximum token limit reached, ending stream")
-                        break
-                    
-                    # Log token progress periodically
-                    if token_count % 100 == 0:
-                        logger.debug(f"Processed {token_count} tokens")
-                    
-                    if token == "<<STEP_END>>":
-                        logger.debug("Received STEP_END token")
-                        yield "</step>"
-                        
-                    elif token == "<<DONE>>":
-                        logger.info("Received DONE token, ending stream")
-                        break
-                        
-                    elif hasattr(token, 'message') and token.message and token.message.additional_kwargs.get("tool_calls"):
-                        tool_calls = token.message.additional_kwargs.get("tool_calls")
-                        if tool_calls and len(tool_calls) > 0:
-                            try:
-                                if tool_name := tool_calls[0]["function"]["name"]:
-                                    logger.info(f"Tool call detected: {tool_name}")
-                                    yield f"<step><step_name>{tool_name}</step_name>"
-                                    
-                                if tool_args := tool_calls[0]["function"]["arguments"]:
-                                    logger.debug(f"Tool args: {tool_args[:100]}{'...' if len(tool_args) > 100 else ''}")
-                                    yield tool_args
-                            except (KeyError, IndexError, TypeError) as e:
-                                logger.error(f"Error processing tool call: {str(e)}")
-                                continue
-                    else:
-                        # Handle other token types or content
-                        if hasattr(token, 'content') and token.content:
-                            yield token.content
-                        elif isinstance(token, str):
-                            yield token
-                            
-                except Exception as e:
-                    logger.error(f"Error processing individual token: {str(e)}")
-                    continue
-                    
-        except asyncio.TimeoutError:
-            logger.error("Streaming timed out")
-        except Exception as e:
-            logger.error(f"Error in token streaming loop: {str(e)}")
-            
-        # Wait for the agent task to complete or timeout
-        try:
-            done, pending = await asyncio.wait(
-                [task, timeout_task], 
-                return_when=asyncio.FIRST_COMPLETED,
-                timeout=10.0  # Additional 10 second grace period
-            )
-            
-            # Cancel any pending tasks
-            for pending_task in pending:
-                pending_task.cancel()
+        async for token in streamer:
+            try:
+                token_count += 1
+                logger.debug(f"Processing token #{token_count}: {type(token)}")
                 
-            # Check if the main task completed
-            if task in done:
-                try:
-                    result = await task
-                    logger.info("Agent task completed successfully")
-                except Exception as e:
-                    logger.error(f"Agent task failed: {str(e)}")
-            else:
-                logger.warning("Agent task timed out")
-                task.cancel()
+                if token == "<<STEP_END>>":
+                    logger.info("Received STEP_END token")
+                    # send end of step token
+                    yield "</step>"
+                elif hasattr(token, 'message') and token.message and (tool_calls := token.message.additional_kwargs.get("tool_calls")):
+                    logger.info("Processing tool call token")
+                    if tool_name := tool_calls[0]["function"]["name"]:
+                        logger.info(f"Tool call detected: {tool_name}")
+                        # send start of step token followed by step name tokens
+                        yield f"<step><step_name>{tool_name}</step_name>"
+                    if tool_args := tool_calls[0]["function"]["arguments"]:
+                        logger.debug(f"Tool args: {tool_args[:100]}{'...' if len(tool_args) > 100 else ''}")
+                        # tool args are streamed directly, ensure it's properly encoded
+                        yield tool_args
+                else:
+                    # Handle other token types or content
+                    if hasattr(token, 'content') and token.content:
+                        logger.debug("Yielding token content")
+                        yield token.content
+                    elif isinstance(token, str):
+                        logger.debug("Yielding string token")
+                        yield token
+                        
+            except Exception as e:
+                logger.error(f"Error streaming token: {e}")
+                continue
                 
-        except asyncio.TimeoutError:
-            logger.error("Final timeout reached, cancelling agent task")
-            task.cancel()
-        except Exception as e:
-            logger.error(f"Error waiting for agent task: {str(e)}")
-            
-        logger.info(f"Token generation completed. Total tokens processed: {token_count}")
+        logger.info("Token streaming completed, waiting for agent task...")
+        await task
+        logger.info(f"Agent task completed. Total tokens processed: {token_count}")
         
     except Exception as e:
         logger.error(f"Critical error in token generator: {str(e)}")
@@ -225,3 +162,7 @@ async def invoke(content: str = Form(...)):
             "error": f"Internal server error: {str(e)}",
             "execution_time": execution_time
         }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

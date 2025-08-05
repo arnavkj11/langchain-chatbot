@@ -469,10 +469,17 @@ class QueueCallbackHandler(AsyncCallbackHandler):
         self.final_answer_seen = False
         self.token_count = 0
         self.max_tokens = 10000  # Prevent infinite streaming
+        self._done = False
         logger.debug("QueueCallbackHandler initialized")
 
-    async def __aiter__(self):
+    def __aiter__(self):
         logger.debug("Starting streaming iteration")
+        return self
+
+    async def __anext__(self):
+        if self._done:
+            raise StopAsyncIteration
+            
         timeout_count = 0
         max_timeouts = 300  # 30 seconds with 0.1s sleep
         
@@ -488,27 +495,33 @@ class QueueCallbackHandler(AsyncCallbackHandler):
                 
                 if token_or_done == "<<DONE>>":
                     logger.info(f"Streaming completed. Total tokens: {self.token_count}")
-                    return
+                    self._done = True
+                    raise StopAsyncIteration
                     
                 if token_or_done == "<<TIMEOUT>>":
                     logger.warning("Streaming timed out")
-                    return
+                    self._done = True
+                    raise StopAsyncIteration
                     
                 if token_or_done:
                     self.token_count += 1
                     if self.token_count > self.max_tokens:
                         logger.warning("Maximum token limit reached, stopping stream")
-                        return
-                    yield token_or_done
+                        self._done = True
+                        raise StopAsyncIteration
+                    return token_or_done
                     
             except asyncio.TimeoutError:
                 logger.debug("Queue get timeout, continuing...")
                 continue
             except Exception as e:
                 logger.error(f"Error in streaming iteration: {str(e)}")
-                return
+                self._done = True
+                raise StopAsyncIteration
                 
         logger.warning("Streaming timed out after 30 seconds")
+        self._done = True
+        raise StopAsyncIteration
     
     async def on_llm_new_token(self, *args, **kwargs) -> None:
         try:
