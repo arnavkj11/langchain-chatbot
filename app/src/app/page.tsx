@@ -4,11 +4,33 @@ import Output from "@/components/Output";
 import TextArea from "@/components/TextArea";
 import ThemeToggle from "@/components/ThemeToggle";
 import { type ChatOutput } from "@/types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+// Logging utility for main page
+const log = {
+  info: (message: string, data?: any) => {
+    console.log(`🏠 [HomePage] ${message}`, data ? data : '');
+  },
+  debug: (message: string, data?: any) => {
+    console.debug(`🟡 [HomePage] ${message}`, data ? data : '');
+  }
+};
 
 export default function Home() {
   const [outputs, setOutputs] = useState<ChatOutput[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    log.info('HomePage mounted');
+  }, []);
+
+  useEffect(() => {
+    log.debug(`Outputs updated: ${outputs.length} total conversations`);
+  }, [outputs]);
+
+  useEffect(() => {
+    log.debug(`Generation state: ${isGenerating ? 'ACTIVE' : 'IDLE'}`);
+  }, [isGenerating]);
 
   return (
     <div className="min-h-screen flex flex-col">

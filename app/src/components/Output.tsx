@@ -2,8 +2,28 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { Step, type ChatOutput } from "@/types";
 import { useEffect, useState } from "react";
 
+// Logging utility for Output component
+const log = {
+  info: (message: string, data?: any) => {
+    console.log(`🟦 [Output] ${message}`, data ? data : '');
+  },
+  debug: (message: string, data?: any) => {
+    console.debug(`🟨 [Output] ${message}`, data ? data : '');
+  }
+};
+
 const Output = ({ output }: { output: ChatOutput }) => {
   const detailsHidden = !!output.result?.answer;
+  
+  useEffect(() => {
+    log.info('Output component rendered', {
+      question: output.question.substring(0, 50) + (output.question.length > 50 ? '...' : ''),
+      stepsCount: output.steps.length,
+      hasAnswer: !!output.result?.answer,
+      toolsUsed: output.result?.tools_used || []
+    });
+  }, [output]);
+  
   return (
     <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-gray-600/50 shadow-lg p-6 hover:shadow-xl transition-all duration-300 message-appear">
       {/* Question */}
@@ -113,14 +133,27 @@ const GenerationSteps = ({ steps, done }: { steps: Step[]; done: boolean }) => {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    if (done) setHidden(true);
-  }, [done]);
+    log.debug('GenerationSteps updated', {
+      stepsCount: steps.length,
+      done,
+      stepNames: steps.map(s => s.name)
+    });
+    if (done) {
+      log.info('Generation completed - hiding steps');
+      setHidden(true);
+    }
+  }, [done, steps]);
+
+  const toggleSteps = () => {
+    setHidden(!hidden);
+    log.debug(`Steps visibility toggled: ${hidden ? 'showing' : 'hiding'}`);
+  };
 
   return (
     <div className="bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl mt-4 p-4 shadow-sm">
       <button
         className="w-full text-left flex items-center justify-between hover:bg-gray-50 rounded-lg p-2 transition-colors"
-        onClick={() => setHidden(!hidden)}
+        onClick={toggleSteps}
       >
         <div className="flex items-center space-x-2">
           <div
