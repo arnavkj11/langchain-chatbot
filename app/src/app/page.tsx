@@ -9,11 +9,11 @@ import { useState, useEffect } from "react";
 // Logging utility for main page
 const log = {
   info: (message: string, data?: any) => {
-    console.log(`🏠 [HomePage] ${message}`, data ? data : '');
+    console.log(`🏠 [HomePage] ${message}`, data ? data : "");
   },
   debug: (message: string, data?: any) => {
-    console.debug(`🟡 [HomePage] ${message}`, data ? data : '');
-  }
+    console.debug(`🟡 [HomePage] ${message}`, data ? data : "");
+  },
 };
 
 export default function Home() {
@@ -21,7 +21,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
-    log.info('HomePage mounted');
+    log.info("HomePage mounted");
   }, []);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function Home() {
   }, [outputs]);
 
   useEffect(() => {
-    log.debug(`Generation state: ${isGenerating ? 'ACTIVE' : 'IDLE'}`);
+    log.debug(`Generation state: ${isGenerating ? "ACTIVE" : "IDLE"}`);
   }, [isGenerating]);
 
   return (

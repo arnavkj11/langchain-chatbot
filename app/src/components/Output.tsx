@@ -5,25 +5,27 @@ import { useEffect, useState } from "react";
 // Logging utility for Output component
 const log = {
   info: (message: string, data?: any) => {
-    console.log(`🟦 [Output] ${message}`, data ? data : '');
+    console.log(`🟦 [Output] ${message}`, data ? data : "");
   },
   debug: (message: string, data?: any) => {
-    console.debug(`🟨 [Output] ${message}`, data ? data : '');
-  }
+    console.debug(`🟨 [Output] ${message}`, data ? data : "");
+  },
 };
 
 const Output = ({ output }: { output: ChatOutput }) => {
   const detailsHidden = !!output.result?.answer;
-  
+
   useEffect(() => {
-    log.info('Output component rendered', {
-      question: output.question.substring(0, 50) + (output.question.length > 50 ? '...' : ''),
+    log.info("Output component rendered", {
+      question:
+        output.question.substring(0, 50) +
+        (output.question.length > 50 ? "..." : ""),
       stepsCount: output.steps.length,
       hasAnswer: !!output.result?.answer,
-      toolsUsed: output.result?.tools_used || []
+      toolsUsed: output.result?.tools_used || [],
     });
   }, [output]);
-  
+
   return (
     <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-2xl border border-white/50 dark:border-gray-600/50 shadow-lg p-6 hover:shadow-xl transition-all duration-300 message-appear">
       {/* Question */}
@@ -133,20 +135,20 @@ const GenerationSteps = ({ steps, done }: { steps: Step[]; done: boolean }) => {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    log.debug('GenerationSteps updated', {
+    log.debug("GenerationSteps updated", {
       stepsCount: steps.length,
       done,
-      stepNames: steps.map(s => s.name)
+      stepNames: steps.map((s) => s.name),
     });
     if (done) {
-      log.info('Generation completed - hiding steps');
+      log.info("Generation completed - hiding steps");
       setHidden(true);
     }
   }, [done, steps]);
 
   const toggleSteps = () => {
     setHidden(!hidden);
-    log.debug(`Steps visibility toggled: ${hidden ? 'showing' : 'hiding'}`);
+    log.debug(`Steps visibility toggled: ${hidden ? "showing" : "hiding"}`);
   };
 
   return (

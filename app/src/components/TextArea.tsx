@@ -7,17 +7,17 @@ import { ChatOutput } from "@/types";
 // Logging utility functions
 const log = {
   info: (message: string, data?: any) => {
-    console.log(`🔵 [TextArea] ${message}`, data ? data : '');
+    console.log(`🔵 [TextArea] ${message}`, data ? data : "");
   },
   error: (message: string, error?: any) => {
-    console.error(`🔴 [TextArea] ${message}`, error ? error : '');
+    console.error(`🔴 [TextArea] ${message}`, error ? error : "");
   },
   debug: (message: string, data?: any) => {
-    console.debug(`🟡 [TextArea] ${message}`, data ? data : '');
+    console.debug(`🟡 [TextArea] ${message}`, data ? data : "");
   },
   success: (message: string, data?: any) => {
-    console.log(`🟢 [TextArea] ${message}`, data ? data : '');
-  }
+    console.log(`🟢 [TextArea] ${message}`, data ? data : "");
+  },
 };
 
 const TextArea = ({
@@ -48,9 +48,9 @@ const TextArea = ({
   // Sends message to the api and handles streaming response processing
   const sendMessage = async (text: string) => {
     const requestId = Math.random().toString(36).substr(2, 8);
-    log.info(`[${requestId}] Starting message send process`, { 
-      messageLength: text.length, 
-      currentOutputsCount: outputs.length 
+    log.info(`[${requestId}] Starting message send process`, {
+      messageLength: text.length,
+      currentOutputsCount: outputs.length,
     });
 
     const newOutputs = [
@@ -67,12 +67,14 @@ const TextArea = ({
 
     setOutputs(newOutputs);
     setIsGenerating(true);
-    log.debug(`[${requestId}] UI state updated - generating: true, outputs count: ${newOutputs.length}`);
+    log.debug(
+      `[${requestId}] UI state updated - generating: true, outputs count: ${newOutputs.length}`
+    );
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       log.info(`[${requestId}] Making API request to: ${apiUrl}/invoke`);
-      
+
       const startTime = performance.now();
       const res = await fetch(`${apiUrl}/invoke?content=${text}`, {
         method: "POST",
@@ -83,10 +85,16 @@ const TextArea = ({
       });
 
       const connectionTime = performance.now() - startTime;
-      log.info(`[${requestId}] API connection established in ${connectionTime.toFixed(2)}ms`);
+      log.info(
+        `[${requestId}] API connection established in ${connectionTime.toFixed(
+          2
+        )}ms`
+      );
 
       if (!res.ok) {
-        log.error(`[${requestId}] API request failed with status: ${res.status} ${res.statusText}`);
+        log.error(
+          `[${requestId}] API request failed with status: ${res.status} ${res.statusText}`
+        );
         throw new Error("Error");
       }
 
@@ -113,10 +121,12 @@ const TextArea = ({
         done = doneReading;
         let chunkValue = decoder.decode(value);
         chunkCount++;
-        
-        log.debug(`[${requestId}] Chunk ${chunkCount} received`, { 
+
+        log.debug(`[${requestId}] Chunk ${chunkCount} received`, {
           length: chunkValue?.length || 0,
-          preview: chunkValue?.substring(0, 50) + (chunkValue?.length > 50 ? '...' : '')
+          preview:
+            chunkValue?.substring(0, 50) +
+            (chunkValue?.length > 50 ? "..." : ""),
         });
         if (!chunkValue) continue;
 
@@ -128,12 +138,14 @@ const TextArea = ({
           if (stepNameMatch) {
             const [_, stepName] = stepNameMatch;
             log.info(`[${requestId}] Processing step: ${stepName}`);
-            
+
             try {
               if (stepName !== "final_answer") {
                 stepCount++;
-                log.debug(`[${requestId}] Processing regular step ${stepCount}: ${stepName}`);
-                
+                log.debug(
+                  `[${requestId}] Processing regular step ${stepCount}: ${stepName}`
+                );
+
                 const fullStepPattern =
                   /<step><step_name>([^<]*)<\/step_name>([^<]*?)(?=<step>|<\/step>|$)/g;
                 const matches = [...buffer.matchAll(fullStepPattern)];
@@ -145,9 +157,15 @@ const TextArea = ({
                       const result = JSON.parse(jsonStr);
                       currentSteps.push({ name: matchStepName, result });
                       buffer = buffer.replace(fullMatch, "");
-                      log.success(`[${requestId}] Step ${matchStepName} parsed successfully`, result);
+                      log.success(
+                        `[${requestId}] Step ${matchStepName} parsed successfully`,
+                        result
+                      );
                     } catch (parseError) {
-                      log.error(`[${requestId}] Failed to parse step JSON for ${matchStepName}`, parseError);
+                      log.error(
+                        `[${requestId}] Failed to parse step JSON for ${matchStepName}`,
+                        parseError
+                      );
                     }
                   }
                 }
@@ -163,9 +181,9 @@ const TextArea = ({
                   const result = parser.getObjects();
                   answer = result;
                   parser.reset();
-                  log.success(`[${requestId}] Final answer parsed`, { 
+                  log.success(`[${requestId}] Final answer parsed`, {
                     answerLength: answer.answer?.length || 0,
-                    toolsUsed: answer.tools_used 
+                    toolsUsed: answer.tools_used,
                   });
                 }
               }
@@ -186,29 +204,30 @@ const TextArea = ({
               result: answer,
             },
           ];
-          
-          log.debug(`[${requestId}] UI updated`, { 
+
+          log.debug(`[${requestId}] UI updated`, {
             stepsCount: currentSteps.length,
-            hasAnswer: !!answer.answer 
+            hasAnswer: !!answer.answer,
           });
-          
+
           return updated;
         });
       }
-      
+
       const totalTime = performance.now() - startTime;
       log.success(`[${requestId}] Stream processing completed`, {
         totalTime: `${totalTime.toFixed(2)}ms`,
         chunksProcessed: chunkCount,
         stepsProcessed: stepCount,
-        finalAnswerLength: answer.answer?.length || 0
+        finalAnswerLength: answer.answer?.length || 0,
       });
-      
     } catch (error) {
       log.error(`[${requestId}] Error in sendMessage:`, error);
     } finally {
       setIsGenerating(false);
-      log.info(`[${requestId}] Message processing completed - generating: false`);
+      log.info(
+        `[${requestId}] Message processing completed - generating: false`
+      );
     }
   };
 
@@ -227,7 +246,7 @@ const TextArea = ({
       const oldHeight = textArea.style.height;
       textArea.style.height = "auto";
       textArea.style.height = `${textArea.scrollHeight}px`;
-      
+
       if (oldHeight !== textArea.style.height) {
         log.debug(`Textarea height adjusted to ${textArea.style.height}`);
       }
@@ -255,7 +274,9 @@ const TextArea = ({
 
   // Log when generating state changes
   useEffect(() => {
-    log.info(`Generation state changed: ${isGenerating ? 'STARTED' : 'STOPPED'}`);
+    log.info(
+      `Generation state changed: ${isGenerating ? "STARTED" : "STOPPED"}`
+    );
   }, [isGenerating]);
 
   // Log when text changes

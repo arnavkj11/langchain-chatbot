@@ -9,51 +9,58 @@ interface LogData {
 
 export class Logger {
   private component: string;
-  private static isDevelopment = process.env.NODE_ENV === 'development';
-  
+  private static isDevelopment = process.env.NODE_ENV === "development";
+
   constructor(component: string) {
     this.component = component;
   }
 
   private formatMessage(level: string, message: string): string {
-    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    const timestamp = new Date().toISOString().split("T")[1].split(".")[0];
     const emoji = this.getEmoji(level);
     return `${emoji} [${timestamp}] [${this.component}] ${message}`;
   }
 
   private getEmoji(level: string): string {
     switch (level.toLowerCase()) {
-      case 'info': return '🔵';
-      case 'success': return '🟢';
-      case 'warn': case 'warning': return '🟡';
-      case 'error': return '🔴';
-      case 'debug': return '🟣';
-      default: return '⚪';
+      case "info":
+        return "🔵";
+      case "success":
+        return "🟢";
+      case "warn":
+      case "warning":
+        return "🟡";
+      case "error":
+        return "🔴";
+      case "debug":
+        return "🟣";
+      default:
+        return "⚪";
     }
   }
 
   info(message: string, data?: LogData): void {
     if (!Logger.isDevelopment) return;
-    console.log(this.formatMessage('info', message), data || '');
+    console.log(this.formatMessage("info", message), data || "");
   }
 
   success(message: string, data?: LogData): void {
     if (!Logger.isDevelopment) return;
-    console.log(this.formatMessage('success', message), data || '');
+    console.log(this.formatMessage("success", message), data || "");
   }
 
   warn(message: string, data?: LogData): void {
     if (!Logger.isDevelopment) return;
-    console.warn(this.formatMessage('warn', message), data || '');
+    console.warn(this.formatMessage("warn", message), data || "");
   }
 
   error(message: string, error?: any): void {
-    console.error(this.formatMessage('error', message), error || '');
+    console.error(this.formatMessage("error", message), error || "");
   }
 
   debug(message: string, data?: LogData): void {
     if (!Logger.isDevelopment) return;
-    console.debug(this.formatMessage('debug', message), data || '');
+    console.debug(this.formatMessage("debug", message), data || "");
   }
 
   // Performance timing utilities
@@ -85,4 +92,4 @@ export const createLogger = (component: string): Logger => {
 };
 
 // Global application logger
-export const appLogger = createLogger('App');
+export const appLogger = createLogger("App");

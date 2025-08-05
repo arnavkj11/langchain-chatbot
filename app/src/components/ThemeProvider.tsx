@@ -14,19 +14,19 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 // Logging utility for Theme
 const log = {
   info: (message: string, data?: any) => {
-    console.log(`🎨 [Theme] ${message}`, data ? data : '');
+    console.log(`🎨 [Theme] ${message}`, data ? data : "");
   },
   debug: (message: string, data?: any) => {
-    console.debug(`🟡 [Theme] ${message}`, data ? data : '');
-  }
+    console.debug(`🟡 [Theme] ${message}`, data ? data : "");
+  },
 };
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    log.info('ThemeProvider initializing');
-    
+    log.info("ThemeProvider initializing");
+
     // Check for saved theme in localStorage or use system preference
     const savedTheme = localStorage.getItem("theme") as Theme;
     if (savedTheme) {
@@ -34,7 +34,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setTheme(savedTheme);
     } else {
       // Check system preference
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
       const systemTheme = prefersDark ? "dark" : "light";
       log.info(`No saved theme found, using system preference: ${systemTheme}`);
       setTheme(systemTheme);
@@ -43,7 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     log.debug(`Applying theme: ${theme}`);
-    
+
     // Apply theme to document
     if (theme === "dark") {
       document.documentElement.classList.add("dark");
@@ -51,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.classList.remove("dark");
     }
     localStorage.setItem("theme", theme);
-    
+
     log.info(`Theme successfully applied and saved: ${theme}`);
   }, [theme]);
 
