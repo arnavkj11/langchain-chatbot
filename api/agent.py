@@ -406,10 +406,7 @@ async def serpapi(query: str) -> list[Article]:
             "q": query,
         }
         
-        # Add timeout to prevent hanging
-        timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
-        
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(
                     "https://serpapi.com/search",
@@ -431,9 +428,6 @@ async def serpapi(query: str) -> list[Article]:
                     logger.info(f"Successfully retrieved {len(articles)} search results")
                     return articles
                     
-            except asyncio.TimeoutError:
-                logger.error("SerpAPI request timed out after 30 seconds")
-                return []
             except aiohttp.ClientError as e:
                 logger.error(f"Network error during SerpAPI request: {str(e)}")
                 return []
@@ -480,26 +474,16 @@ class QueueCallbackHandler(AsyncCallbackHandler):
         if self._done:
             raise StopAsyncIteration
             
-        timeout_count = 0
-        max_timeouts = 300  # 30 seconds with 0.1s sleep
-        
-        while timeout_count < max_timeouts:
+        while True:
             try:
                 if self.queue.empty():
                     await asyncio.sleep(0.1)
-                    timeout_count += 1
                     continue
                 
-                timeout_count = 0  # Reset timeout counter when we get data
-                token_or_done = await asyncio.wait_for(self.queue.get(), timeout=1.0)
+                token_or_done = await self.queue.get()
                 
                 if token_or_done == "<<DONE>>":
                     logger.info(f"Streaming completed. Total tokens: {self.token_count}")
-                    self._done = True
-                    raise StopAsyncIteration
-                    
-                if token_or_done == "<<TIMEOUT>>":
-                    logger.warning("Streaming timed out")
                     self._done = True
                     raise StopAsyncIteration
                     
@@ -511,17 +495,10 @@ class QueueCallbackHandler(AsyncCallbackHandler):
                         raise StopAsyncIteration
                     return token_or_done
                     
-            except asyncio.TimeoutError:
-                logger.debug("Queue get timeout, continuing...")
-                continue
             except Exception as e:
                 logger.error(f"Error in streaming iteration: {str(e)}")
                 self._done = True
                 raise StopAsyncIteration
-                
-        logger.warning("Streaming timed out after 30 seconds")
-        self._done = True
-        raise StopAsyncIteration
     
     async def on_llm_new_token(self, *args, **kwargs) -> None:
         try:
@@ -577,12 +554,9 @@ async def execute_tool(tool_call: AIMessage) -> ToolMessage:
                 tool_call_id=tool_call_id
             )
         
-        # Add timeout for tool execution
+        # Add tool execution
         try:
-            tool_out = await asyncio.wait_for(
-                name2tool[tool_name](**tool_args),
-                timeout=60.0  # 60 second timeout for tool execution
-            )
+            tool_out = await name2tool[tool_name](**tool_args)
             logger.info(f"Successfully executed tool: {tool_name}")
             
             return ToolMessage(
@@ -590,21 +564,13 @@ async def execute_tool(tool_call: AIMessage) -> ToolMessage:
                 tool_call_id=tool_call_id
             )
             
-        except asyncio.TimeoutError:
-            error_msg = f"Tool {tool_name} execution timed out after 60 seconds"
+        except KeyError as e:
+            error_msg = f"Missing required field in tool call: {str(e)}"
             logger.error(error_msg)
             return ToolMessage(
                 content=f"Error: {error_msg}",
-                tool_call_id=tool_call_id
+                tool_call_id=getattr(tool_call, 'tool_call_id', 'unknown')
             )
-            
-    except KeyError as e:
-        error_msg = f"Missing required field in tool call: {str(e)}"
-        logger.error(error_msg)
-        return ToolMessage(
-            content=f"Error: {error_msg}",
-            tool_call_id=getattr(tool_call, 'tool_call_id', 'unknown')
-        )
     except Exception as e:
         error_msg = f"Unexpected error executing tool: {str(e)}"
         logger.error(error_msg)
@@ -639,8 +605,6 @@ class CustomAgentExecutor:
         count = 0
         final_answer: str | None = None
         agent_scratchpad: list[AIMessage | ToolMessage] = []
-        start_time = asyncio.get_event_loop().time()
-        max_execution_time = 300  # 5 minutes maximum
         
         # streaming function with error handling
         async def stream(query: str) -> list[AIMessage]:
@@ -653,34 +617,29 @@ class CustomAgentExecutor:
                 # our streamed output
                 outputs = []
                 
-                # Add timeout to streaming
-                stream_timeout = 120  # 2 minutes for streaming
-                
                 try:
-                    # now we begin streaming with timeout
-                    async for token in asyncio.wait_for(response.astream({
+                    # Step 1: Get the async iterator directly (no await needed)
+                    stream = response.astream({
                         "input": query,
                         "chat_history": self.chat_history,
                         "agent_scratchpad": agent_scratchpad
-                    }), timeout=stream_timeout):
-                        
-                        # Check for timeout
-                        if asyncio.get_event_loop().time() - start_time > max_execution_time:
-                            logger.error("Maximum execution time exceeded")
-                            break
-                            
+                    })
+
+                    # Step 2: now iterate over the stream
+                    async for token in stream:
                         tool_calls = token.additional_kwargs.get("tool_calls")
                         if tool_calls:
-                            # first check if we have a tool call id - this indicates a new tool
+                            # New tool call starts when tool_calls[0]["id"] is truthy
                             if tool_calls[0]["id"]:
                                 outputs.append(token)
                             else:
-                                if outputs:  # Make sure outputs is not empty
+                                # Continuation of previous tool call
+                                if outputs:
                                     outputs[-1] += token
-                        else:
-                            pass
-                            
-                except asyncio.TimeoutError:
+                        # else: no tool calls in this token, skip or handle other tokens here
+
+                except Exception as e:
+                    logger.error(f"Error during streaming: {str(e)}")
                     return []
                     
                 logger.debug(f"Streaming completed with {len(outputs)} outputs")
@@ -692,8 +651,7 @@ class CustomAgentExecutor:
                         if x.tool_calls and len(x.tool_calls) > 0:
                             result.append(AIMessage(
                                 content=x.content,
-                                tool_calls=x.tool_calls,
-                                tool_call_id=x.tool_calls[0]["id"]
+                                tool_calls=x.tool_calls
                             ))
                     except Exception as e:
                         logger.error(f"Error creating AIMessage: {str(e)}")
@@ -707,11 +665,6 @@ class CustomAgentExecutor:
 
         try:
             while count < self.max_iterations:
-                # Check for timeout
-                if asyncio.get_event_loop().time() - start_time > max_execution_time:
-                    logger.error("Maximum execution time exceeded")
-                    break
-                    
                 logger.info(f"Starting iteration {count + 1}/{self.max_iterations}")
                 
                 # invoke a step for the agent to generate a tool call
@@ -750,11 +703,11 @@ class CustomAgentExecutor:
                     break
                 
                 # append tool calls and tool observations to the scratchpad in order
-                id2tool_obs = {tool_call.tool_call_id: tool_obs for tool_call, tool_obs in zip(tool_calls, tool_obs)}
+                id2tool_obs = {tool_call.tool_calls[0]["id"]: tool_obs[i] for i, tool_call in enumerate(tool_calls)}
                 for tool_call in tool_calls:
                     agent_scratchpad.extend([
                         tool_call,
-                        id2tool_obs[tool_call.tool_call_id]
+                        id2tool_obs[tool_call.tool_calls[0]["id"]]
                     ])
                 
                 count += 1

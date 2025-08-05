@@ -15,8 +15,9 @@ const TextArea = ({
   setOutputs: React.Dispatch<React.SetStateAction<ChatOutput[]>>;
   outputs: ChatOutput[];
 }) => {
-  // Parser instance to handle incomplete JSON streaming responses
+  // Parser instances to handle incomplete JSON streaming responses
   const parser = new IncompleteJsonParser();
+  const stepParser = new IncompleteJsonParser();
 
   const [text, setText] = useState("");
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -31,6 +32,10 @@ const TextArea = ({
   // Sends message to the api and handles streaming response processing
   const sendMessage = async (text: string) => {
     console.log("🚀 Sending message:", text);
+
+    // Reset parsers for new message
+    parser.reset();
+    stepParser.reset();
 
     const newOutputs = [
       ...outputs,
@@ -128,16 +133,23 @@ const TextArea = ({
                     const [fullMatch, matchStepName, jsonStr] = match;
                     if (jsonStr) {
                       try {
-                        const result = JSON.parse(jsonStr);
-                        console.log(
-                          "✅ Parsed step result:",
-                          matchStepName,
-                          result
-                        );
-                        currentSteps.push({ name: matchStepName, result });
-                        buffer = buffer.replace(fullMatch, "");
+                        // Use incomplete JSON parser for step results to handle partial JSON
+                        stepParser.write(jsonStr);
+                        const parsedResults = stepParser.getObjects();
+                        
+                        if (parsedResults && typeof parsedResults === 'object') {
+                          console.log(
+                            "✅ Parsed step result:",
+                            matchStepName,
+                            parsedResults
+                          );
+                          currentSteps.push({ name: matchStepName, result: parsedResults });
+                          buffer = buffer.replace(fullMatch, "");
+                        }
+                        stepParser.reset();
                       } catch (error) {
                         console.error("❌ Failed to parse step JSON:", error);
+                        stepParser.reset(); // Reset parser state on error
                       }
                     }
                   }
@@ -149,11 +161,17 @@ const TextArea = ({
                   if (jsonMatch) {
                     const [_, jsonStr] = jsonMatch;
                     console.log("🎯 Processing final answer:", jsonStr);
-                    parser.write(jsonStr);
-                    const result = parser.getObjects();
-                    answer = result;
-                    parser.reset();
-                    console.log("✅ Final answer parsed:", answer);
+                    try {
+                      parser.write(jsonStr);
+                      const result = parser.getObjects();
+                      if (result && typeof result === 'object') {
+                        answer = result;
+                        console.log("✅ Final answer parsed:", answer);
+                      }
+                    } catch (error) {
+                      console.error("❌ Failed to parse final answer JSON:", error);
+                      parser.reset(); // Reset parser state on error
+                    }
                   }
                 }
               } catch (e) {
@@ -199,6 +217,9 @@ const TextArea = ({
       });
     } finally {
       setIsGenerating(false);
+      // Reset parsers to clean up state
+      parser.reset();
+      stepParser.reset();
       console.log("🏁 Message processing finished");
     }
   };
